@@ -23,12 +23,16 @@ def step(x):
 def ReLU(x):
     return np.max(0, x)
 
-def softmax(xlist):
-    # a / b
-    max = np.max(xlist)
-    a = np.array([np.exp(xi-max) for xi in xlist])
-    b = np.sum(a)
-    return a / b;
+def softmax(x):
+    # 2次元データの場合
+    if x.ndim == 2:
+        x = x.T
+        x = x - np.max(x, axis=0)   # オーバーフロー対策
+        y = np.exp(x) / np.sum(np.exp(x), axis=0)
+        return y.T
+
+    x = x - np.max(x) # オーバーフロー対策
+    return np.exp(x) / np.sum(np.exp(x))
 
 if __name__ == '__main__':
     print(step(100))
@@ -42,18 +46,16 @@ def mean_square_error(y, t):
 # 交差エントロピー誤差
 def cross_entropy_error(y, t):
     delta = 1e-7
-    return -np.sum(t * np.log(y + delta))
+#     print('### cross_entropy_error')
+#     print('y: ', y)
+#     print('t: ', t)
+    return -np.sum(np.log(y) * t + delta)
 
 ### 勾配法の実装
 def gradient_descent(gradient, x, lr):
     return x - gradient(x) * lr
 
 ## 数値微分によるパラメータ更新
-# w⇒パラメータ(更新対象)
-# x⇒位置
-def numeric_gradient_learn(f, w, x, lr=0.1):
-    return 1
-
 def numeric_gradient(f, x, lr=1.0):
     delta = 1e-4
     delta_ = 1e4

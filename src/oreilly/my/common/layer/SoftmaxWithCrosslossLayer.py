@@ -15,6 +15,8 @@ class SoftmaxWithCrosslossLayer:
 
     def backward(self, dout=1):
         batch_size = self.t.shape[0]
-        dx = dout * (self.y - self.t) / batch_size
+        t_ = np.zeros(self.y.shape)
+        t_[np.arange(self.t.shape[0]), self.t] = 1
+        dx = dout * (self.y - t_) / batch_size
 
         return dx

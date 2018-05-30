@@ -1,66 +1,70 @@
-from src.oreilly.my.common.layer.AffineLayer import AffineLayer
-from src.oreilly.my.common.layer.SigmoidLayer import SigmoidLayer
-from src.oreilly.my.common.layer.SoftmaxWithCrosslossLayer import SoftmaxWithCrosslossLayer
 import numpy as np
-from src.oreilly.my.common.myUtil import *
+from collections import OrderedDict
+from src.oreilly.my.common.layer.layers import *
 
 class TwoLayerNet:
     def __init__(self, input_size, hidden_size, output_size, weight_init_std=0.01):
-        # 重みとバイアスの定義
+        # 重みの初期化
         self.params = {}
         self.params['w1'] = weight_init_std * np.random.randn(input_size, hidden_size)
-        self.params['b1'] = np.zeros(hidden_size)
         self.params['w2'] = weight_init_std * np.random.randn(hidden_size, output_size)
+        self.params['b1'] = np.zeros(hidden_size)
         self.params['b2'] = np.zeros(output_size)
 
-        # Layerの生成
-        self.layer = {}
-        self.layer['affine'] = AffineLayer()
-        self.layer['sigmoid'] = SigmoidLayer()
-        self.layer['softmax'] = SoftmaxWithCrosslossLayer()
+        # レイヤの生成
+        self.layers = OrderedDict()
+        self.layers['Affine1'] = Affine(self.params['w1'], self.params['b1'])
+        self.layers['Relu1'] = Relu()
+        self.layers['Affine2'] = Affine(self.params['w2'], self.params['b2'])
 
-    # 推論メソッド
+        self.lastLayer = SoftmaxWithLoss()
+
+    # 推論
     def predict(self, x):
-        w1, w2 = self.params['w1'], self.params['w2']
-        b1, b2 = self.params['b1'], self.params['b2']
+        for layer in self.layers.values():
+            x = layer.forward(x)
 
-        a1 = self.layer['affine'].forward(w1, x, b1)
-        z1 = self.layer['sigmoid'].forward(x=a1)
-        a2 = self.layer['affine'].forward(w=w2, x=z1, b=b2)
-        z2 = a2 # ソフトマックス関数の使用は別で実装するためそのまま
+        return x
 
-        return z2
-
-    # 訓練データと教師データを与えて損失関数をもとめる
+    # 損失関数を求める
     def loss(self, x, t):
+        # 推論
         y = self.predict(x)
-        return self.layer['softmax'].forward(x=y, t=t)
+        # ソフトマックス関数を用いて確率に変換
+        # 損失関数を求める
+        return self.lastLayer.forward(y, t)
 
-    # 認識精度を求める
+    # 認識精度
     def accuracy(self, x, t):
+        # 推論
         y = self.predict(x)
+        # テストデータごとの確率が一番高い要素番号（推論ラベル）を取得
         y = np.argmax(y, axis=1)
+        t = np.argmax(t, axis=1)
+        # 認識精度の計算
+        accuracy = np.sum(y == t) / x.shape[0]
 
-        return np.sum(y == t) / float(x.shape[0])
+        return accuracy
 
-    # 勾配を求める
     def gradient(self, x, t):
         # forward
         self.loss(x, t)
 
-        # ソフトマックス関数のバックワード
-        dout = self.layer['softmax'].backward(1)
-        # 第二層のバックワード
-        dw2, dx2, db2 = self.layer['affine'].backward(dout)
-        # シグモイド関数のバックワード
-        dout = self.layer['sigmoid'].backward(dout=dx2)
-        # 第一層のバックワード
-        dw1, dx1, db1 = self.layer['affine'].backward(dout)
+        # backward
+        dout = 1
+        dout = self.lastLayer.backward(dout)
 
+        # レイヤをコピー
+        layers = list(self.layers.values())
+        # バックワード処理のために逆順にする
+        layers.reverse()
+        # バックワード
+        for layer in layers:
+            dout = layer.backward(dout)
+
+        # 勾配を取得
         grads = {}
-        grads['w1'] = dw1
-        grads['w2'] = dw2
-        grads['b1'] = db1
-        grads['b2'] = db2
+        grads['w1'], grads['b1'] = self.layers['Affine1'].dw, self.layers['Affine1'].db
+        grads['w2'], grads['b2'] = self.layers['Affine2'].dw, self.layers['Affine2'].db
 
         return grads
